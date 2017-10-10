@@ -4,6 +4,7 @@ const path = require('path');
 const socketIO = require('socket.io');
 
 const {generateMessage, generateLocationMessage} = require('./utils/message');
+const {isRealString} = require('./utils/validation');
 const port = process.env.PORT || 3000;
 const publicPath = path.join(__dirname, '../public');
 
@@ -16,12 +17,16 @@ app.use(express.static(publicPath));
 io.on('connection', (socket) => {
     console.log('New user connected');
 
-    socket.emit('newMessage', generateMessage('Admin', 'Welcome to the chat app'));
-
-    socket.broadcast.emit('newMessage', generateMessage('Admin', 'A new user has joined the chat app'));
-
-    socket.on('disconnect', () => {
-        console.log('User Disconnected from server');
+    socket.on('join', (params, callback) => {
+        // console.log('server got a join event');
+        if(!isRealString(params.name) || !isRealString(params.room)){
+            callback('Name and room name are required');
+        }
+        // console.log(params);
+        socket.join(params.room);
+        socket.emit('newMessage', generateMessage('Admin', 'Welcome to the chat app'));
+        socket.broadcast.to(params.room).emit('newMessage', generateMessage('Admin', `${params.name} has joined room: ${params.room}`));
+        callback();
     });
 
     socket.on('createMessage', (message, callback) => {
@@ -32,6 +37,10 @@ io.on('connection', (socket) => {
 
     socket.on('createLocationMessage', (coords) => {
         io.emit('newLocationMessage', generateLocationMessage('Admin', coords.latitude, coords.longitude))
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User Disconnected from server');
     });
 });
 
